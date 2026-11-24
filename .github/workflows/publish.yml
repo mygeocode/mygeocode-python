@@ -1,0 +1,43 @@
+name: Publish to PyPI
+
+# Runs when a GitHub release is published. PyPI trusts this workflow directly (Trusted Publishing),
+# so no API token is stored anywhere. The release tag must match the package version, for example v1.1.1.
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/mygeocode/
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - name: Run the tests
+        run: python tests/run.py
+
+      - name: Check that the release tag matches the package version
+        run: |
+          version="$(python -c 'import sys; sys.path.insert(0, "src"); import mygeocode; print(mygeocode.__version__)')"
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "Release tag ${GITHUB_REF_NAME} does not match package version ${version}"
+            exit 1
+          fi
+
+      - name: Build the wheel and source archive
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
